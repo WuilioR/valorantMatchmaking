@@ -41,17 +41,27 @@ export const useMatchmaking = (): UseMatchmakingReturn => {
     setError(null);
     
     try {
+      // Generate a unique user ID for this session
+      const userID = localStorage.getItem('temp-user-id') || 'user-' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('temp-user-id', userID);
+      
+      console.log('Attempting to join queue with userID:', userID);
+      
       const response = await fetch('http://localhost:8080/api/queue/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': 'temp-user-id' // TODO: Get from auth context
+          'X-User-ID': userID
         }
       });
       
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
       
-      if (response.ok && data.success) {
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok) {
         setIsInQueue(true);
         await fetchQueueStatus();
       } else {

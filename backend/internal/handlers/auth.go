@@ -4,9 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"valorant-mobile-web/backend/internal/services"
 	"valorant-mobile-web/backend/pkg/utils"
 )
+
+// In-memory user storage for development
+var userStore = make(map[string]string) // email -> password
+var userMutex sync.RWMutex
 
 type AuthHandler struct {
 	AuthService *services.AuthService
@@ -53,16 +58,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hash password (for development, we'll just verify it works)
-	_, err := h.AuthService.HashPassword(req.Password)
+	hashedPassword, err := h.AuthService.HashPassword(req.Password)
 	if err != nil {
 		println("ERROR: Failed to hash password:", err.Error())
 		utils.ErrorResponse(w, "Failed to process password", http.StatusInternalServerError)
 		return
 	}
 
-	println("SUCCESS: User registration successful")
+	// Store user in memory
+	userMutex.Lock()
+	userStore[req.Email] = hashedPassword
+	userMutex.Unlock()
 
-	// TODO: Save user to database
+	println("SUCCESS: User registration successful and stored") // TODO: Save user to database
 	// For now, just return success with mock user data
 	response := map[string]interface{}{
 		"success": true,
@@ -100,8 +108,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Verify user credentials from database
-	// For now, generate a token for any valid request
+	// Verify user credentials
+	userMutex.RLock()
+	storedHash, exists := userStore[req.Email]
+	userMutex.RUnlock()
+
+	if !exists {
+		println("ERROR: User not found:", req.Email)
+		utils.ErrorResponse(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify password
+	if err := h.AuthService.VerifyPassword(storedHash, req.Password); err != nil {
+		println("ERROR: Invalid password for:", req.Email)
+		utils.ErrorResponse(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Generate token for authenticated user
 	token, err := h.AuthService.GenerateToken("dummy-user-id")
 	if err != nil {
 		println("ERROR: Failed to generate token:", err.Error())

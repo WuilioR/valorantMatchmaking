@@ -1,109 +1,131 @@
 package services
 
 import (
-    "valorant-mobile-web/backend/internal/database"
-    "valorant-mobile-web/backend/internal/models"
+	"fmt"
+	"sync"
+	"time"
+	"valorant-mobile-web/backend/internal/models"
 )
 
-type QueueService struct{}
+type QueueService struct {
+	queue map[string]*models.QueueEntry
+	mutex sync.RWMutex
+}
 
 func NewQueueService() *QueueService {
-    return &QueueService{}
+	return &QueueService{
+		queue: make(map[string]*models.QueueEntry),
+	}
 }
 
 func (qs *QueueService) JoinQueue(userID string) error {
-    query := `INSERT INTO queue (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`
-    _, err := database.DB.Exec(query, userID)
-    return err
+	qs.mutex.Lock()
+	defer qs.mutex.Unlock()
+
+	mockUsers := map[string]struct {
+		username string
+		elo      int
+	}{
+		"mock-user-id": {"TestUser1", 1250},
+		"user-2":       {"TestUser2", 1180},
+		"user-3":       {"ProPlayer", 1850},
+		"user-4":       {"Newbie", 950},
+	}
+
+	userData, exists := mockUsers[userID]
+	if !exists {
+		userData = struct {
+			username string
+			elo      int
+		}{"Player" + userID[len(userID)-3:], 1200}
+	}
+
+	qs.queue[userID] = &models.QueueEntry{
+		UserID:   userID,
+		Username: userData.username,
+		ELO:      userData.elo,
+		JoinedAt: time.Now(),
+	}
+
+	fmt.Printf("USER JOINED QUEUE: %s (%s) - Queue size: %d\n", userData.username, userID, len(qs.queue))
+	return nil
 }
 
 func (qs *QueueService) LeaveQueue(userID string) error {
-    query := `DELETE FROM queue WHERE user_id = $1`
-    _, err := database.DB.Exec(query, userID)
-    return err
+	qs.mutex.Lock()
+	defer qs.mutex.Unlock()
+
+	if entry, exists := qs.queue[userID]; exists {
+		delete(qs.queue, userID)
+		fmt.Printf("USER LEFT QUEUE: %s (%s) - Queue size: %d\n", entry.Username, userID, len(qs.queue))
+	}
+
+	return nil
 }
 
 func (qs *QueueService) GetQueueStatus() (*models.QueueStatus, error) {
-    query := `
-        SELECT q.user_id, u.username, u.elo, q.joined_at
-        FROM queue q
-        JOIN users u ON q.user_id = u.id
-        ORDER BY q.joined_at ASC
-    `
-    
-    rows, err := database.DB.Query(query)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
-    
-    var players []models.QueueEntry
-    for rows.Next() {
-        var player models.QueueEntry
-        err := rows.Scan(&player.UserID, &player.Username, &player.ELO, &player.JoinedAt)
-        if err != nil {
-            return nil, err
-        }
-        players = append(players, player)
-    }
-    
-    canStart := len(players) >= 10
-    estimatedWait := "2-5 minutes"
-    if len(players) >= 8 {
-        estimatedWait = "30 seconds - 2 minutes"
-    } else if len(players) >= 5 {
-        estimatedWait = "1-3 minutes"
-    }
-    
-    return &models.QueueStatus{
-        PlayersInQueue: len(players),
-        Players:        players,
-        EstimatedWait:  estimatedWait,
-        CanStartMatch:  canStart,
-    }, nil
+	qs.mutex.RLock()
+	defer qs.mutex.RUnlock()
+
+	var players []models.QueueEntry
+	for _, entry := range qs.queue {
+		players = append(players, *entry)
+	}
+
+	playersCount := len(players)
+	canStart := playersCount >= 2
+
+	estimatedWait := "Waiting for players..."
+	if playersCount >= 2 {
+		estimatedWait = "Match starting soon!"
+	} else if playersCount >= 1 {
+		estimatedWait = "1 more player needed"
+	}
+
+	fmt.Printf("QUEUE STATUS: %d players, canStart: %v\n", playersCount, canStart)
+
+	return &models.QueueStatus{
+		PlayersInQueue: playersCount,
+		Players:        players,
+		EstimatedWait:  estimatedWait,
+		CanStartMatch:  canStart,
+	}, nil
 }
 
 func (qs *QueueService) CanStartMatch() bool {
-    var count int
-    query := `SELECT COUNT(*) FROM queue`
-    database.DB.QueryRow(query).Scan(&count)
-    return count >= 10
+	qs.mutex.RLock()
+	defer qs.mutex.RUnlock()
+	return len(qs.queue) >= 2
 }
 
 func (qs *QueueService) GetQueuedPlayers(limit int) ([]models.QueueEntry, error) {
-    query := `
-        SELECT q.user_id, u.username, u.elo, q.joined_at
-        FROM queue q
-        JOIN users u ON q.user_id = u.id
-        ORDER BY q.joined_at ASC
-        LIMIT $1
-    `
-    
-    rows, err := database.DB.Query(query, limit)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
-    
-    var players []models.QueueEntry
-    for rows.Next() {
-        var player models.QueueEntry
-        err := rows.Scan(&player.UserID, &player.Username, &player.ELO, &player.JoinedAt)
-        if err != nil {
-            return nil, err
-        }
-        players = append(players, player)
-    }
-    
-    return players, nil
+	qs.mutex.RLock()
+	defer qs.mutex.RUnlock()
+
+	var players []models.QueueEntry
+	count := 0
+	for _, entry := range qs.queue {
+		if count >= limit {
+			break
+		}
+		players = append(players, *entry)
+		count++
+	}
+
+	fmt.Printf("GETTING PLAYERS FOR MATCH: Found %d players\n", len(players))
+	return players, nil
 }
 
 func (qs *QueueService) RemovePlayersFromQueue(userIDs []string) error {
-    if len(userIDs) == 0 {
-        return nil
-    }
-    
-    query := `DELETE FROM queue WHERE user_id = ANY($1)`
-    _, err := database.DB.Exec(query, userIDs)
-    return err
+	qs.mutex.Lock()
+	defer qs.mutex.Unlock()
+
+	for _, userID := range userIDs {
+		if entry, exists := qs.queue[userID]; exists {
+			delete(qs.queue, userID)
+			fmt.Printf("REMOVED FROM QUEUE FOR MATCH: %s (%s)\n", entry.Username, userID)
+		}
+	}
+
+	return nil
 }

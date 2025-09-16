@@ -54,19 +54,19 @@ func SetupRoutes() *mux.Router {
 	api.HandleFunc("/auth/login", authHandler.Login).Methods("POST", "OPTIONS")
 
 	// Queue endpoints
-	api.HandleFunc("/queue/join", queueHandler.JoinQueue).Methods("POST")
-	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("DELETE")
-	api.HandleFunc("/queue/status", queueHandler.GetQueueStatus).Methods("GET")
+	api.HandleFunc("/queue/join", queueHandler.JoinQueue).Methods("POST", "OPTIONS")
+	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/queue/status", queueHandler.GetQueueStatus).Methods("GET", "OPTIONS")
 
 	// Match endpoints
-	api.HandleFunc("/match/start", matchHandler.StartMatch).Methods("POST")
-	api.HandleFunc("/match/ban", matchHandler.BanMap).Methods("POST")
-	api.HandleFunc("/match/{matchId}/select-map", matchHandler.SelectMap).Methods("POST")
-	api.HandleFunc("/match/report", matchHandler.ReportResult).Methods("POST")
+	api.HandleFunc("/match/start", matchHandler.StartMatch).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match/ban", matchHandler.BanMap).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match/{matchId}/select-map", matchHandler.SelectMap).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match/report", matchHandler.ReportResult).Methods("POST", "OPTIONS")
 
 	// Leaderboard endpoints
-	api.HandleFunc("/leaderboard", leaderboardHandler.GetLeaderboard).Methods("GET")
-	api.HandleFunc("/leaderboard/user", leaderboardHandler.GetUserRank).Methods("GET")
+	api.HandleFunc("/leaderboard", leaderboardHandler.GetLeaderboard).Methods("GET", "OPTIONS")
+	api.HandleFunc("/leaderboard/user", leaderboardHandler.GetUserRank).Methods("GET", "OPTIONS")
 
 	return router
 }
