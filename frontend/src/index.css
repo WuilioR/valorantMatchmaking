@@ -1,0 +1,123 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Fuentes Valorant */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* Custom components */
+@layer components {
+  .btn-primary {
+    @apply bg-valorant-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105;
+  }
+  
+  .btn-secondary {
+    @apply bg-valorant-gray-600 hover:bg-valorant-gray-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-valorant-red text-valorant-red hover:bg-valorant-red hover:text-white font-bold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+  
+  .card {
+    @apply bg-valorant-gray-800 rounded-lg p-6 shadow-lg border border-valorant-gray-700;
+  }
+  
+  .input-field {
+    @apply bg-valorant-gray-700 border border-valorant-gray-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-valorant-red focus:ring-1 focus:ring-valorant-red;
+  }
+  
+  .player-card {
+    @apply bg-valorant-gray-800 border border-valorant-gray-600 rounded-lg p-4 hover:border-valorant-red transition-all duration-200;
+  }
+  
+  .match-status-waiting {
+    @apply bg-yellow-600 text-yellow-100;
+  }
+  
+  .match-status-ongoing {
+    @apply bg-green-600 text-green-100;
+  }
+  
+  .match-status-completed {
+    @apply bg-blue-600 text-blue-100;
+  }
+  
+  .elo-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .elo-iron {
+    @apply bg-gray-700 text-gray-300;
+  }
+  
+  .elo-bronze {
+    @apply bg-amber-700 text-amber-300;
+  }
+  
+  .elo-silver {
+    @apply bg-gray-500 text-gray-100;
+  }
+  
+  .elo-gold {
+    @apply bg-yellow-600 text-yellow-100;
+  }
+  
+  .elo-platinum {
+    @apply bg-cyan-600 text-cyan-100;
+  }
+  
+  .elo-diamond {
+    @apply bg-purple-600 text-purple-100;
+  }
+  
+  .elo-immortal {
+    @apply bg-red-600 text-red-100;
+  }
+  
+  .elo-radiant {
+    @apply bg-gradient-to-r from-yellow-400 to-red-500 text-white;
+  }
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF4655;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff3344;
+}
+
+/* Animaciones personalizadas */
+.glow-red {
+  box-shadow: 0 0 10px rgba(255, 70, 85, 0.5);
+}
+
+.text-glow {
+  text-shadow: 0 0 10px rgba(255, 70, 85, 0.8);
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top: 3px solid #FF4655;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
