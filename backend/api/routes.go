@@ -16,7 +16,7 @@ func SetupRoutes() *mux.Router {
 			// Configurar headers CORS
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, Accept, Origin, X-Requested-With")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-Username, X-User-ELO, Accept, Origin, X-Requested-With")
 			w.Header().Set("Access-Control-Max-Age", "3600")
 
 			// Log para debug
@@ -55,7 +55,7 @@ func SetupRoutes() *mux.Router {
 
 	// Queue endpoints
 	api.HandleFunc("/queue/join", queueHandler.JoinQueue).Methods("POST", "OPTIONS")
-	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("POST", "DELETE", "OPTIONS")
 	api.HandleFunc("/queue/status", queueHandler.GetQueueStatus).Methods("GET", "OPTIONS")
 
 	// Match endpoints

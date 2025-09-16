@@ -47,17 +47,41 @@ const Matchmaking: React.FC = () => {
     setError('');
     
     try {
+      // Get stored user ID or create one based on user's email
+      let userID = localStorage.getItem('session-user-id');
+      if (!userID) {
+        // Use email-based ID for consistency
+        userID = `user-${user.email.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}`;
+        localStorage.setItem('session-user-id', userID);
+      }
+      
+      // Use real user data
+      const username = user.username || user.email.split('@')[0];
+      const elo = user.elo || 1200;
+      
+      console.log('Joining queue with:', { userID, username, elo });
+      
       const response = await fetch('http://localhost:8080/api/queue/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': user.id || 'temp-user-id'
-        }
+          'X-User-ID': userID,
+          'X-Username': username,
+          'X-User-ELO': elo.toString()
+        },
+        body: JSON.stringify({
+          username: username,
+          elo: elo
+        })
       });
       
       const data = await response.json();
       
       if (response.ok && data.success) {
+        // Store the user ID returned by backend (in case it was generated there)
+        if (data.userID) {
+          localStorage.setItem('session-user-id', data.userID);
+        }
         setIsInQueue(true);
         fetchQueueStatus();
       } else {
@@ -76,19 +100,31 @@ const Matchmaking: React.FC = () => {
     if (!user) return;
 
     setLoading(true);
+    setError('');
     
     try {
+      const userID = localStorage.getItem('session-user-id');
+      if (!userID) {
+        setError('No session found');
+        setLoading(false);
+        return;
+      }
+      
       const response = await fetch('http://localhost:8080/api/queue/leave', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': user.id || 'temp-user-id'
+          'X-User-ID': userID
         }
       });
       
-      if (response.ok) {
+      const data = await response.json();
+      
+      if (response.ok && data.success !== false) {
         setIsInQueue(false);
         fetchQueueStatus();
+      } else {
+        setError(data.message || 'Failed to leave queue');
       }
     } catch (error) {
       console.error('Error leaving queue:', error);
@@ -131,23 +167,21 @@ const Matchmaking: React.FC = () => {
 
   // Real-time queue updates
   useEffect(() => {
+    // Initial fetch
     fetchQueueStatus();
     
-    const interval = setInterval(() => {
-      if (isInQueue) {
-        fetchQueueStatus();
-      }
-    }, 2000); // Update every 2 seconds
+    // Set up polling for real-time updates
+    const interval = setInterval(fetchQueueStatus, 1000); // Update every second
 
     return () => clearInterval(interval);
-  }, [isInQueue]);
+  }, []); // Only run once on mount
 
-  // Auto-create match when ready
+  // Check for match creation when queue data changes
   useEffect(() => {
-    if (queueData.can_start_match && isInQueue) {
+    if (queueData.can_start_match && isInQueue && !currentMatch) {
       createMatch();
     }
-  }, [queueData.can_start_match, isInQueue]);
+  }, [queueData.can_start_match, isInQueue, currentMatch]);
 
   // Show match found modal
   if (currentMatch) {
@@ -187,6 +221,12 @@ const Matchmaking: React.FC = () => {
         </div>
       )}
 
+      {queueData.is_queue_full && !isInQueue && (
+        <div className="bg-orange-900 border border-orange-600 text-orange-300 px-4 py-2 rounded mb-6">
+          Queue is currently full. Please wait for the current match to start before joining.
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-8">
         {/* Queue Controls */}
         <div className="bg-valorant-dark-secondary border border-valorant-gray-700 rounded-lg p-6">
@@ -195,7 +235,7 @@ const Matchmaking: React.FC = () => {
           <div className="space-y-4 mb-6">
             <div className="flex justify-between">
               <span className="text-valorant-gray-300">Players in Queue:</span>
-              <span className="text-white font-medium">{queueData.players_in_queue}/10</span>
+              <span className="text-white font-medium">{queueData.players_in_queue}/{queueData.max_players || 10}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-valorant-gray-300">Estimated Wait:</span>
@@ -211,18 +251,26 @@ const Matchmaking: React.FC = () => {
 
           <div className="w-full bg-valorant-gray-800 rounded-full h-2 mb-4">
             <div 
-              className="bg-valorant-red h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(queueData.players_in_queue / 10) * 100}%` }}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                queueData.is_queue_full 
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500' 
+                  : 'bg-valorant-red'
+              }`}
+              style={{ width: `${(queueData.players_in_queue / (queueData.max_players || 10)) * 100}%` }}
             />
           </div>
 
           {!isInQueue ? (
             <button
               onClick={joinQueue}
-              disabled={loading}
-              className="btn-primary w-full"
+              disabled={loading || queueData.is_queue_full}
+              className={`w-full ${
+                queueData.is_queue_full 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'btn-primary'
+              }`}
             >
-              {loading ? 'Joining...' : 'JOIN QUEUE'}
+              {loading ? 'Joining...' : queueData.is_queue_full ? 'QUEUE FULL' : 'JOIN QUEUE'}
             </button>
           ) : (
             <button

@@ -7,25 +7,40 @@ interface QueueStatusProps {
 }
 
 const QueueStatus: React.FC<QueueStatusProps> = ({ queueData, isInQueue }) => {
-  const progressPercentage = Math.min((queueData.players_in_queue / 10) * 100, 100);
+  const maxPlayers = queueData.max_players || 10;
+  const progressPercentage = Math.min((queueData.players_in_queue / maxPlayers) * 100, 100);
 
   return (
     <div className="card">
       <h2 className="text-2xl font-bold mb-6 text-white">Queue Status</h2>
+      
+      {/* Queue Full Warning */}
+      {queueData.is_queue_full && (
+        <div className="mb-4 p-3 bg-orange-900 border border-orange-600 text-orange-300 rounded-lg">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-orange-400 rounded-full mr-2 animate-pulse"></div>
+            Queue is full! New queue will start after match begins.
+          </div>
+        </div>
+      )}
       
       {/* Players Count */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <span className="text-valorant-gray-300">Players Ready</span>
           <span className="text-white font-bold">
-            {queueData.players_in_queue}/10
+            {queueData.players_in_queue}/{maxPlayers}
           </span>
         </div>
         
         {/* Progress Bar */}
         <div className="w-full bg-valorant-gray-800 rounded-full h-3 mb-4">
           <div 
-            className="bg-gradient-to-r from-valorant-red to-orange-500 h-3 rounded-full transition-all duration-500 ease-out"
+            className={`h-3 rounded-full transition-all duration-500 ease-out ${
+              queueData.is_queue_full 
+                ? 'bg-gradient-to-r from-orange-500 to-red-500' 
+                : 'bg-gradient-to-r from-valorant-red to-orange-500'
+            }`}
             style={{ width: `${progressPercentage}%` }}
           />
         </div>

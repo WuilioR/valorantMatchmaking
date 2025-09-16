@@ -35,24 +35,38 @@ export const useMatchmaking = (): UseMatchmakingReturn => {
     }
   }, []);
 
-  // Join queue
+  // Join queue - Note: This hook doesn't have access to user context, 
+  // so this is mainly for demonstration. In practice, use the component version.
   const joinQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Generate a unique user ID for this session
-      const userID = localStorage.getItem('temp-user-id') || 'user-' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('temp-user-id', userID);
+      // Get or generate a unique user ID for this session
+      let userID = localStorage.getItem('session-user-id');
+      if (!userID) {
+        userID = `temp-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('session-user-id', userID);
+      }
       
-      console.log('Attempting to join queue with userID:', userID);
+      // For this hook, we'll use basic defaults since we don't have user context
+      const username = 'TestUser'; // In real usage, get from user context
+      const elo = 1200; // Default ELO for development
+      
+      console.log('Attempting to join queue with userID:', userID, 'username:', username);
       
       const response = await fetch('http://localhost:8080/api/queue/join', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': userID
-        }
+          'X-User-ID': userID,
+          'X-Username': username,
+          'X-User-ELO': elo.toString()
+        },
+        body: JSON.stringify({
+          username: username,
+          elo: elo
+        })
       });
       
       console.log('Response status:', response.status);
@@ -61,7 +75,11 @@ export const useMatchmaking = (): UseMatchmakingReturn => {
       const data = await response.json();
       console.log('Response data:', data);
       
-      if (response.ok) {
+      if (response.ok && data.success) {
+        // Store the user ID returned by backend (in case it was generated there)
+        if (data.userID) {
+          localStorage.setItem('session-user-id', data.userID);
+        }
         setIsInQueue(true);
         await fetchQueueStatus();
       } else {
@@ -81,17 +99,22 @@ export const useMatchmaking = (): UseMatchmakingReturn => {
     setError(null);
     
     try {
+      const userID = localStorage.getItem('session-user-id');
+      if (!userID) {
+        throw new Error('No session found');
+      }
+      
       const response = await fetch('http://localhost:8080/api/queue/leave', {
-        method: 'DELETE',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': 'temp-user-id' // TODO: Get from auth context
+          'X-User-ID': userID
         }
       });
       
       const data = await response.json();
       
-      if (response.ok && data.success) {
+      if (response.ok && data.success !== false) {
         setIsInQueue(false);
         setCurrentMatch(null);
         await fetchQueueStatus();
@@ -128,29 +151,21 @@ export const useMatchmaking = (): UseMatchmakingReturn => {
     }
   }, [isInQueue, queueData?.can_start_match]);
 
-  // Auto-refresh queue status when in queue
+  // Auto-refresh queue status - now always runs for real-time updates
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    
-    if (isInQueue) {
-      // Poll every 3 seconds when in queue
-      intervalId = setInterval(() => {
-        fetchQueueStatus();
-        checkMatchReady();
-      }, 3000);
-    }
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isInQueue, fetchQueueStatus, checkMatchReady]);
-
-  // Initial load
-  useEffect(() => {
+    // Initial fetch
     fetchQueueStatus();
-  }, [fetchQueueStatus]);
+    
+    // Poll every 1 second for real-time updates
+    const intervalId = setInterval(() => {
+      fetchQueueStatus();
+      if (isInQueue) {
+        checkMatchReady();
+      }
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [isInQueue, fetchQueueStatus, checkMatchReady]);
 
   return {
     isInQueue,

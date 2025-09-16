@@ -1,61 +1,78 @@
 package handlers
 
 import (
-    "net/http"
-    "valorant-mobile-web/backend/internal/services"
-    "valorant-mobile-web/backend/pkg/utils"
+	"fmt"
+	"net/http"
+	"strconv"
+	"valorant-mobile-web/backend/internal/services"
+	"valorant-mobile-web/backend/pkg/utils"
 )
 
 type MatchmakingHandler struct {
-    matchmakingService *services.MatchmakingService
-    queueService       *services.QueueService
+	matchmakingService *services.MatchmakingService
+	queueService       *services.QueueService
 }
 
 func NewMatchmakingHandler() *MatchmakingHandler {
-    return &MatchmakingHandler{
-        matchmakingService: services.NewMatchmakingService(),
-        queueService:       services.NewQueueService(),
-    }
+	return &MatchmakingHandler{
+		matchmakingService: services.NewMatchmakingService(),
+		queueService:       services.NewQueueService(),
+	}
 }
 
 func (h *MatchmakingHandler) JoinQueue(w http.ResponseWriter, r *http.Request) {
-    userID := r.Header.Get("X-User-ID")
-    if userID == "" {
-        utils.ErrorResponse(w, "User ID required", http.StatusBadRequest)
-        return
-    }
+	userID := r.Header.Get("X-User-ID")
+	username := r.Header.Get("X-Username")
+	eloStr := r.Header.Get("X-User-ELO")
 
-    err := h.queueService.JoinQueue(userID)
-    if err != nil {
-        utils.ErrorResponse(w, "Failed to join queue", http.StatusInternalServerError)
-        return
-    }
+	if userID == "" {
+		utils.ErrorResponse(w, "User ID required", http.StatusBadRequest)
+		return
+	}
 
-    utils.MessageResponse(w, "Successfully joined the queue")
+	// Set default values if not provided
+	if username == "" {
+		username = fmt.Sprintf("Player%s", userID[len(userID)-4:])
+	}
+
+	elo := 1200 // default ELO
+	if eloStr != "" {
+		if parsedELO, err := strconv.Atoi(eloStr); err == nil {
+			elo = parsedELO
+		}
+	}
+
+	err := h.queueService.JoinQueue(userID, username, elo)
+	if err != nil {
+		utils.ErrorResponse(w, "Failed to join queue", http.StatusInternalServerError)
+		return
+	}
+
+	utils.MessageResponse(w, "Successfully joined the queue")
 }
 
 func (h *MatchmakingHandler) LeaveQueue(w http.ResponseWriter, r *http.Request) {
-    userID := r.Header.Get("X-User-ID")
-    if userID == "" {
-        utils.ErrorResponse(w, "User ID required", http.StatusBadRequest)
-        return
-    }
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		utils.ErrorResponse(w, "User ID required", http.StatusBadRequest)
+		return
+	}
 
-    err := h.queueService.LeaveQueue(userID)
-    if err != nil {
-        utils.ErrorResponse(w, "Failed to leave queue", http.StatusInternalServerError)
-        return
-    }
+	err := h.queueService.LeaveQueue(userID)
+	if err != nil {
+		utils.ErrorResponse(w, "Failed to leave queue", http.StatusInternalServerError)
+		return
+	}
 
-    utils.MessageResponse(w, "Successfully left the queue")
+	utils.MessageResponse(w, "Successfully left the queue")
 }
 
 func (h *MatchmakingHandler) StartMatch(w http.ResponseWriter, r *http.Request) {
-    match, err := h.matchmakingService.CreateMatch()
-    if err != nil {
-        utils.ErrorResponse(w, "Failed to start match: "+err.Error(), http.StatusBadRequest)
-        return
-    }
+	match, err := h.matchmakingService.CreateMatch()
+	if err != nil {
+		utils.ErrorResponse(w, "Failed to start match: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
-    utils.SuccessResponse(w, match)
+	utils.SuccessResponse(w, match)
 }

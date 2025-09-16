@@ -32,6 +32,8 @@ export interface QueueData {
     players: Player[];
     estimated_wait: string;
     can_start_match: boolean;
+    max_players?: number;
+    is_queue_full?: boolean;
 }
 
 export interface LeaderboardEntry {
