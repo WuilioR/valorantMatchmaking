@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { QueueData, Match } from '../../types';
+import MatchAcceptance from './MatchAcceptance';
 
 const Matchmaking: React.FC = () => {
   const { user } = useAuth();
@@ -16,6 +17,9 @@ const Matchmaking: React.FC = () => {
     can_start_match: false
   });
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
+  const [foundMatch, setFoundMatch] = useState<Match | null>(null);
+  const [showAcceptance, setShowAcceptance] = useState(false);
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
 
   // Fetch queue status
   const fetchQueueStatus = async () => {
@@ -33,6 +37,36 @@ const Matchmaking: React.FC = () => {
     } catch (error) {
       console.error('Error fetching queue status:', error);
       setError('Failed to fetch queue status');
+    }
+  };
+
+  // Check if player has a pending match
+  const checkForPendingMatch = async () => {
+    try {
+      const userID = localStorage.getItem('session-user-id');
+      const response = await fetch('http://localhost:8080/api/match-room/player', {
+        headers: {
+          'X-User-ID': userID || ''
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data && data.data.match) {
+          console.log('📢 Found pending match for player:', data.data.match);
+          
+          // Player has a pending match - show acceptance popup
+          setFoundMatch(data.data.match);
+          setShowAcceptance(true);
+          setCurrentMatch(data.data.match);
+          setIsInQueue(false);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking for pending match:', error);
+      return false;
     }
   };
 
@@ -136,52 +170,98 @@ const Matchmaking: React.FC = () => {
 
   // Create match when ready
   const createMatch = async () => {
+    // Prevent multiple simultaneous match creation attempts
+    if (isCreatingMatch) {
+      console.log('Match creation already in progress, skipping...');
+      return;
+    }
+    
+    setIsCreatingMatch(true);
+    
     try {
-      const response = await fetch('http://localhost:8080/api/matchmaking/create', {
+      console.log('Attempting to create match...');
+      const userID = localStorage.getItem('session-user-id');
+      const response = await fetch('http://localhost:8080/api/match-room/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': user?.id || 'temp-user-id'
-        },
-        body: JSON.stringify({
-          game_mode: 'competitive',
-          map_pool: ['bind', 'haven', 'split', 'ascent', 'icebox']
-        })
+          'X-User-ID': userID || ''
+        }
       });
       
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
       
-      if (response.ok && data.success) {
-        setCurrentMatch(data.data);
+      const data = await response.json();
+      console.log('Parsed data:', data);
+      console.log('data.success:', data.success);
+      console.log('data.data:', data.data);
+      console.log('data.data.match:', data.data?.match);
+      
+      if (response.ok && data.success && data.data && data.data.match) {
+        console.log('✅ Match created successfully:', data.data.match);
+        
+        // Show acceptance popup instead of immediately navigating
+        setFoundMatch(data.data.match);
+        setShowAcceptance(true);
+        setCurrentMatch(data.data.match);
         setIsInQueue(false);
-        // Navigate to game lobby after a short delay to show match found
-        setTimeout(() => {
-          navigate(`/game/${data.data.id}`);
-        }, 3000);
+      } else {
+        console.log('❌ Failed to create match:', data.message || data.data?.message);
+        setError(data.message || data.data?.message || 'Failed to create match room');
       }
     } catch (error) {
-      console.error('Error creating match:', error);
-      setError('Failed to create match');
+      console.error('Error creating match room:', error);
+      setError('Failed to create match room');
+    } finally {
+      setIsCreatingMatch(false);
     }
   };
 
-  // Real-time queue updates
+  // Real-time queue updates and match detection
   useEffect(() => {
+    const pollForUpdates = async () => {
+      // First check if player has a pending match
+      if (isInQueue && !showAcceptance && !currentMatch) {
+        const hasPendingMatch = await checkForPendingMatch();
+        if (hasPendingMatch) {
+          return; // Stop polling queue if we found a match
+        }
+      }
+      
+      // Then check queue status
+      await fetchQueueStatus();
+    };
+
     // Initial fetch
-    fetchQueueStatus();
+    pollForUpdates();
     
     // Set up polling for real-time updates
-    const interval = setInterval(fetchQueueStatus, 1000); // Update every second
+    const interval = setInterval(pollForUpdates, 1000); // Update every second
 
     return () => clearInterval(interval);
-  }, []); // Only run once on mount
+  }, [isInQueue, showAcceptance, currentMatch]); // Dependencies to re-run when these change
 
-  // Check for match creation when queue data changes
+  // Check for match room creation when queue data changes
   useEffect(() => {
-    if (queueData.can_start_match && isInQueue && !currentMatch) {
+    if (queueData.should_create_match && isInQueue && queueData.players_in_queue === 2 && !currentMatch && !isCreatingMatch) { // TEMPORARY: Changed from 10 to 2
       createMatch();
     }
-  }, [queueData.can_start_match, isInQueue, currentMatch]);
+  }, [queueData.should_create_match, queueData.players_in_queue, isInQueue, currentMatch, isCreatingMatch]);
+
+  const handleMatchAccept = () => {
+    console.log('Match accepted');
+    // The acceptance is handled by the MatchAcceptance component
+    // We can add additional logic here if needed
+  };
+
+  const handleMatchDecline = () => {
+    console.log('Match declined');
+    setFoundMatch(null);
+    setShowAcceptance(false);
+    setCurrentMatch(null);
+    setError('Match was declined. You have been returned to the queue.');
+  };
 
   // Show match found modal
   if (currentMatch) {
@@ -337,6 +417,15 @@ const Matchmaking: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Match Acceptance Popup */}
+      {showAcceptance && foundMatch && (
+        <MatchAcceptance
+          match={foundMatch}
+          onAccept={handleMatchAccept}
+          onDecline={handleMatchDecline}
+        />
       )}
     </div>
   );

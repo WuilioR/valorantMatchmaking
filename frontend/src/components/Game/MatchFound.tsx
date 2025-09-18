@@ -130,7 +130,11 @@ const MatchFound: React.FC<MatchFoundProps> = ({ match }) => {
             </div>
             <div>
               <span className="text-valorant-gray-400">Average ELO:</span>
-              <div className="text-white font-medium">{match.avg_elo || '1400'}</div>
+              <div className="text-white font-medium">
+                {match.players?.length > 0 
+                  ? Math.round(match.players.reduce((sum, p) => sum + (p.elo || 1200), 0) / match.players.length)
+                  : '1400'}
+              </div>
             </div>
             <div>
               <span className="text-valorant-gray-400">Server:</span>

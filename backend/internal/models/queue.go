@@ -12,10 +12,12 @@ type QueueEntry struct {
 }
 
 type QueueStatus struct {
-	PlayersInQueue int          `json:"players_in_queue"`
-	Players        []QueueEntry `json:"players"`
-	EstimatedWait  string       `json:"estimated_wait"`
-	CanStartMatch  bool         `json:"can_start_match"`
-	MaxPlayers     int          `json:"max_players"`
-	IsQueueFull    bool         `json:"is_queue_full"`
+    PlayersInQueue    int          `json:"players_in_queue"`
+    CurrentPlayers    int          `json:"current_players"` // Add for frontend compatibility
+    Players           []QueueEntry `json:"players"`
+    EstimatedWait     string       `json:"estimated_wait"`
+    CanStartMatch     bool         `json:"can_start_match"`
+    MaxPlayers        int          `json:"max_players"`
+    IsQueueFull       bool         `json:"is_queue_full"`
+    ShouldCreateMatch bool         `json:"should_create_match"`
 }

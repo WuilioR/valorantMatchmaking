@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Multiple Users</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .user-box { border: 1px solid #ccc; margin: 10px; padding: 15px; border-radius: 5px; }
+        button { margin: 5px; padding: 8px 15px; }
+        .status { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Test Multiple Users in Queue</h1>
+    <button onclick="joinMultipleUsers()">Join 9 Users to Queue</button>
+    <button onclick="clearQueue()">Clear Queue</button>
+    <button onclick="checkStatus()">Check Queue Status</button>
+    
+    <div id="status"></div>
+    <div id="users"></div>
+
+    <script>
+        const baseUrl = 'http://localhost:8080/api';
+        
+        async function joinMultipleUsers() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Joining users...';
+            
+            for (let i = 1; i <= 9; i++) {
+                try {
+                    const response = await fetch(`${baseUrl}/queue/join`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-User-ID': `test-user-${i}`,
+                            'X-Username': `TestUser${i}`,
+                            'X-User-ELO': `${1200 + (i * 50)}`
+                        },
+                        body: JSON.stringify({
+                            username: `TestUser${i}`,
+                            elo: 1200 + (i * 50)
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    console.log(`User ${i} joined:`, result);
+                    
+                    if (!response.ok) {
+                        console.error(`Error joining user ${i}:`, result);
+                        statusDiv.innerHTML += `<br>Error joining user ${i}: ${result.message}`;
+                    } else {
+                        statusDiv.innerHTML += `<br>User ${i} joined successfully`;
+                    }
+                    
+                } catch (error) {
+                    console.error(`Error joining user ${i}:`, error);
+                    statusDiv.innerHTML += `<br>Network error joining user ${i}`;
+                }
+                
+                // Small delay between joins
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            statusDiv.innerHTML += '<br><strong>9 users joined! Now join manually to complete the queue.</strong>';
+        }
+        
+        async function clearQueue() {
+            // This would require implementing a clear endpoint
+            console.log('Clear queue functionality needs backend endpoint');
+        }
+        
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${baseUrl}/queue/status`);
+                const data = await response.json();
+                
+                document.getElementById('status').innerHTML = `
+                    <h3>Queue Status:</h3>
+                    <p>Players: ${data.queue_status?.players_in_queue || 0}/10</p>
+                    <p>Can Start: ${data.queue_status?.can_start_match || false}</p>
+                    <p>Should Create Match: ${data.queue_status?.should_create_match || false}</p>
+                `;
+                
+                const usersDiv = document.getElementById('users');
+                usersDiv.innerHTML = '<h3>Players in Queue:</h3>';
+                
+                if (data.queue_status?.players) {
+                    data.queue_status.players.forEach(player => {
+                        usersDiv.innerHTML += `
+                            <div class="user-box">
+                                <strong>${player.username}</strong> - ELO: ${player.elo}
+                            </div>
+                        `;
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+        
+        // Auto-refresh status every 2 seconds
+        setInterval(checkStatus, 2000);
+        checkStatus(); // Initial check
+    </script>
+</body>
+</html>

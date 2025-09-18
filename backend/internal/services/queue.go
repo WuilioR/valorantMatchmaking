@@ -17,7 +17,7 @@ type QueueService struct {
 func NewQueueService() *QueueService {
 	return &QueueService{
 		queue:      make(map[string]*models.QueueEntry),
-		maxPlayers: 10, // Maximum players for a match
+		maxPlayers: 2, // TEMPORARY: Changed from 10 to 2 for testing
 	}
 }
 
@@ -96,12 +96,14 @@ func (qs *QueueService) GetQueueStatus() (*models.QueueStatus, error) {
 		playersCount, qs.maxPlayers, canStart, qs.isQueueFull)
 
 	return &models.QueueStatus{
-		PlayersInQueue: playersCount,
-		Players:        players,
-		EstimatedWait:  estimatedWait,
-		CanStartMatch:  canStart,
-		MaxPlayers:     qs.maxPlayers,
-		IsQueueFull:    qs.isQueueFull,
+		PlayersInQueue:    playersCount,
+		CurrentPlayers:    playersCount, // Add for frontend compatibility
+		Players:           players,
+		EstimatedWait:     estimatedWait,
+		CanStartMatch:     canStart,
+		MaxPlayers:        qs.maxPlayers,
+		IsQueueFull:       qs.isQueueFull,
+		ShouldCreateMatch: canStart, // Indicates frontend should create match room
 	}, nil
 }
 

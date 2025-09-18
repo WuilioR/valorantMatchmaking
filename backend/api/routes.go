@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"valorant-mobile-web/backend/internal/handlers"
+	"valorant-mobile-web/backend/internal/services"
 
 	"github.com/gorilla/mux"
 )
@@ -33,9 +34,15 @@ func SetupRoutes() *mux.Router {
 		})
 	})
 
-	// Initialize handlers
-	queueHandler := handlers.NewQueueHandler()
-	matchHandler := handlers.NewMatchHandler()
+	// Initialize shared services (SINGLETONS)
+	queueService := services.NewQueueService()
+	matchRoomService := services.NewMatchRoomServiceWithQueue(queueService)
+	matchAcceptanceService := services.NewMatchAcceptanceService()
+
+	// Initialize handlers with shared services
+	queueHandler := handlers.NewQueueHandlerWithService(queueService)
+	matchRoomHandler := handlers.NewMatchRoomHandlerWithServices(matchRoomService, queueService)
+	matchAcceptanceHandler := handlers.NewMatchAcceptanceHandlerWithService(matchAcceptanceService)
 	leaderboardHandler := handlers.NewLeaderboardHandler()
 	authHandler := handlers.NewAuthHandler()
 
@@ -55,18 +62,23 @@ func SetupRoutes() *mux.Router {
 
 	// Queue endpoints
 	api.HandleFunc("/queue/join", queueHandler.JoinQueue).Methods("POST", "OPTIONS")
-	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("POST", "DELETE", "OPTIONS")
+	api.HandleFunc("/queue/leave", queueHandler.LeaveQueue).Methods("POST", "OPTIONS")
 	api.HandleFunc("/queue/status", queueHandler.GetQueueStatus).Methods("GET", "OPTIONS")
 
-	// Match endpoints
-	api.HandleFunc("/match/start", matchHandler.StartMatch).Methods("POST", "OPTIONS")
-	api.HandleFunc("/match/ban", matchHandler.BanMap).Methods("POST", "OPTIONS")
-	api.HandleFunc("/match/{matchId}/select-map", matchHandler.SelectMap).Methods("POST", "OPTIONS")
-	api.HandleFunc("/match/report", matchHandler.ReportResult).Methods("POST", "OPTIONS")
+	// Match room endpoints
+	api.HandleFunc("/match-room/create", matchRoomHandler.CreateMatchRoom).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match-room/debug", matchRoomHandler.DebugMatchRoom).Methods("GET", "OPTIONS")
+	api.HandleFunc("/match-room/{matchId}", matchRoomHandler.GetMatchRoom).Methods("GET", "OPTIONS")
+	api.HandleFunc("/match-room/player", matchRoomHandler.GetPlayerMatchRoom).Methods("GET", "OPTIONS")
+	api.HandleFunc("/match-room/{matchId}/captain-selection", matchRoomHandler.SetCaptainSelectionMethod).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match-room/{matchId}/vote-captain", matchRoomHandler.VoteForCaptain).Methods("POST", "OPTIONS")
+
+	// Match acceptance endpoints
+	api.HandleFunc("/match/{id}/accept", matchAcceptanceHandler.AcceptMatch).Methods("POST", "OPTIONS")
+	api.HandleFunc("/match/{id}/decline", matchAcceptanceHandler.DeclineMatch).Methods("POST", "OPTIONS")
 
 	// Leaderboard endpoints
 	api.HandleFunc("/leaderboard", leaderboardHandler.GetLeaderboard).Methods("GET", "OPTIONS")
-	api.HandleFunc("/leaderboard/user", leaderboardHandler.GetUserRank).Methods("GET", "OPTIONS")
 
 	return router
 }

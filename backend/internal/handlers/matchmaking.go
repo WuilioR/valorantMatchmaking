@@ -9,14 +9,12 @@ import (
 )
 
 type MatchmakingHandler struct {
-	matchmakingService *services.MatchmakingService
-	queueService       *services.QueueService
+	queueService *services.QueueService
 }
 
 func NewMatchmakingHandler() *MatchmakingHandler {
 	return &MatchmakingHandler{
-		matchmakingService: services.NewMatchmakingService(),
-		queueService:       services.NewQueueService(),
+		queueService: services.NewQueueService(),
 	}
 }
 
@@ -65,14 +63,4 @@ func (h *MatchmakingHandler) LeaveQueue(w http.ResponseWriter, r *http.Request) 
 	}
 
 	utils.MessageResponse(w, "Successfully left the queue")
-}
-
-func (h *MatchmakingHandler) StartMatch(w http.ResponseWriter, r *http.Request) {
-	match, err := h.matchmakingService.CreateMatch()
-	if err != nil {
-		utils.ErrorResponse(w, "Failed to start match: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	utils.SuccessResponse(w, match)
 }

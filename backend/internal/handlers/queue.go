@@ -20,9 +20,17 @@ type JoinQueueRequest struct {
 	ELO      int    `json:"elo"`
 }
 
-func NewQueueHandler() *QueueHandler {
+// Remove default constructor to enforce singleton usage
+// func NewQueueHandler() *QueueHandler {
+//     return &QueueHandler{
+//         queueService: services.NewQueueService(),
+//     }
+// }
+
+// NewQueueHandlerWithService creates a QueueHandler with a shared service instance
+func NewQueueHandlerWithService(queueService *services.QueueService) *QueueHandler {
 	return &QueueHandler{
-		queueService: services.NewQueueService(),
+		queueService: queueService,
 	}
 }
 

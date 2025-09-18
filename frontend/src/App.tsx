@@ -9,6 +9,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import Matchmaking from './components/Game/Matchmaking';
 import GameLobbyWrapper from './components/Game/GameLobbyWrapper';
+import MatchRoom from './components/Game/MatchRoom';
 import Leaderboard from './components/Leaderboard/Leaderboard';
 import './index.css';
 
@@ -27,6 +28,7 @@ const App: React.FC = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/matchmaking" element={<Matchmaking />} />
+              <Route path="/match-room/:roomId" element={<MatchRoom />} />
               <Route path="/game/:matchId" element={<GameLobbyWrapper />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
             </Routes>
